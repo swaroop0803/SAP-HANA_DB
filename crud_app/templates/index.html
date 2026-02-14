@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintWorks SAP Assistant</title>
+    <style>
+        :root {
+            /* iOS spring curve */
+            --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+            /* Glass tokens */
+            --glass-bg: rgba(255,255,255,0.07);
+            --glass-bg-hover: rgba(255,255,255,0.12);
+            --glass-border: rgba(255,255,255,0.12);
+            --glass-border-hover: rgba(255,255,255,0.22);
+            --glass-blur: blur(24px) saturate(180%);
+            --glass-blur-heavy: blur(40px) saturate(200%);
+            --text-primary: rgba(255,255,255,0.92);
+            --text-secondary: rgba(255,255,255,0.55);
+            --text-tertiary: rgba(255,255,255,0.35);
+            --accent: #f59e0b;
+            --accent-glow: rgba(245,158,11,0.35);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Deep mesh gradient background */
+            background: #0e0f1a;
+            position: relative;
+        }
+
+        /* ── Animated background blobs ── */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            animation: blobFloat 20s ease-in-out infinite alternate;
+        }
+        .blob-1 {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(245,158,11,0.4), transparent 70%);
+            top: -10%; left: -5%;
+            animation-duration: 22s;
+        }
+        .blob-2 {
+            width: 450px; height: 450px;
+            background: radial-gradient(circle, rgba(139,92,246,0.35), transparent 70%);
+            bottom: -10%; right: -5%;
+            animation-duration: 18s;
+            animation-delay: -5s;
+        }
+        .blob-3 {
+            width: 350px; height: 350px;
+            background: radial-gradient(circle, rgba(59,130,246,0.3), transparent 70%);
+            top: 40%; left: 50%;
+            animation-duration: 25s;
+            animation-delay: -10s;
+        }
+        @keyframes blobFloat {
+            0%   { transform: translate(0, 0) scale(1); }
+            33%  { transform: translate(30px, -20px) scale(1.05); }
+            66%  { transform: translate(-20px, 15px) scale(0.95); }
+            100% { transform: translate(15px, -10px) scale(1.02); }
+        }
+
+        /* ── Layout shells on top of blobs ── */
+        .header, .chat-area, .input-area { position: relative; z-index: 1; }
+
+        /* ── Header — frosted glass bar ── */
+        .header {
+            backdrop-filter: var(--glass-blur-heavy);
+            -webkit-backdrop-filter: var(--glass-blur-heavy);
+            background: rgba(14,15,26,0.55);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .header-icon {
+            width: 38px; height: 38px;
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 17px; font-weight: 700; color: #fff;
+            box-shadow: 0 0 20px var(--accent-glow);
+            transition: transform 0.5s var(--spring);
+        }
+        .header-icon:hover { transform: scale(1.1) rotate(-4deg); }
+        .header h1 { font-size: 17px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.2px; }
+        .header .subtitle { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #555;
+            display: inline-block;
+            margin-right: 6px;
+            transition: all 0.4s var(--spring);
+        }
+        .status-dot.ok { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.6); }
+        .status-dot.error { background: #f87171; box-shadow: 0 0 8px rgba(248,113,113,0.6); }
+
+        /* ── Mode toggle switch ── */
+        .mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+            margin-right: auto;
+        }
+        .mode-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            transition: color 0.3s ease;
+            cursor: pointer;
+            user-select: none;
+        }
+        .mode-label.active { color: var(--text-primary); }
+        .toggle-track {
+            position: relative;
+            width: 52px;
+            height: 28px;
+            border-radius: 14px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: all 0.4s var(--spring);
+        }
+        .toggle-track:hover {
+            border-color: var(--glass-border-hover);
+            background: var(--glass-bg-hover);
+        }
+        .toggle-track.bapi {
+            background: rgba(139,92,246,0.15);
+            border-color: rgba(139,92,246,0.35);
+        }
+        .toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            box-shadow: 0 2px 8px var(--accent-glow);
+            transition: all 0.4s var(--spring);
+        }
+        .toggle-track.bapi .toggle-thumb {
+            left: 27px;
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 2px 8px rgba(139,92,246,0.4);
+        }
+        .mode-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 8px;
+            letter-spacing: 0.3px;
+            transition: all 0.3s ease;
+        }
+        .mode-badge.chatv3-badge {
+            background: rgba(245,158,11,0.12);
+            color: #fbbf24;
+            border: 1px solid rgba(245,158,11,0.25);
+        }
+        .mode-badge.bapi-badge {
+            background: rgba(139,92,246,0.12);
+            color: #a78bfa;
+            border: 1px solid rgba(139,92,246,0.25);
+        }
+
+        /* ══════════════════════════════════════════════════════
+           MODE TRANSITION — Semi-transparent circular color wash
+           ══════════════════════════════════════════════════════
+           The overlay is a TINT, not an opaque wall.
+           Content stays visible the whole time.
+           The circle sweeps a color wash from the toggle outward
+           while CSS transitions morph every themed element in place.
+           ══════════════════════════════════════════════════════ */
+
+        .mode-transition-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            clip-path: circle(0px at 50% 50%);
+            will-change: clip-path, opacity;
+        }
+
+        /* Semi-transparent purple tint — content shows through */
+        .mode-transition-overlay.to-bapi {
+            background: rgba(139, 92, 246, 0.12);
+        }
+
+        /* Semi-transparent warm amber tint */
+        .mode-transition-overlay.to-chatv3 {
+            background: rgba(245, 158, 11, 0.10);
+        }
+
+        /* Lock the toggle during animation */
+        .mode-toggle.locked {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* ── Smooth CSS transitions for ALL themed elements ──
+           When body.bapi-active is toggled, every element morphs
+           its colors in place — no flash, no disappear. The
+           transition duration matches the circle sweep so the
+           color change "follows" the expanding wave.            */
+
+        .blob {
+            transition: background 0.6s ease;
+        }
+        .header-icon {
+            transition: background 0.5s ease, box-shadow 0.5s ease, transform 0.5s var(--spring);
+        }
+        .welcome-icon {
+            transition: background 0.5s ease, box-shadow 0.5s ease, transform 0.6s var(--spring);
+        }
+        .input-row button {
+            transition: background 0.5s ease, box-shadow 0.5s ease,
+                        transform 0.4s var(--spring);
+        }
+        .message.user .bubble {
+            transition: background 0.5s ease, box-shadow 0.5s ease,
+                        transform 0.4s var(--spring);
+        }
+        .chip.write {
+            transition: background 0.4s ease, border-color 0.4s ease,
+                        color 0.4s ease, transform 0.4s var(--spring),
+                        box-shadow 0.4s var(--spring);
+        }
+        .loading-dots span {
+            transition: background 0.4s ease;
+        }
+        .refined-query {
+            transition: color 0.4s ease, background 0.4s ease,
+                        border-left-color 0.4s ease;
+        }
+        .qs-card {
+            transition: all 0.45s var(--spring), border-color 0.4s ease;
+        }
+
+        /* ── BAPI-active theme overrides ──
+           Applied to body when BAPI mode is active. Shifts
+           accent color from amber/orange to purple.
+           All changes are picked up by the transitions above
+           for a smooth in-place morph.                          */
+
+        body.bapi-active {
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139,92,246,0.35);
+        }
+
+        body.bapi-active .blob-1 {
+            background: radial-gradient(circle, rgba(139,92,246,0.4), transparent 70%);
+        }
+        body.bapi-active .blob-3 {
+            background: radial-gradient(circle, rgba(99,102,241,0.3), transparent 70%);
+        }
+        body.bapi-active .header-icon {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 0 20px rgba(139,92,246,0.35);
+        }
+        body.bapi-active .input-row button {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 4px 16px rgba(139,92,246,0.35);
+        }
+        body.bapi-active .message.user .bubble {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 4px 20px rgba(139,92,246,0.35);
+        }
+        body.bapi-active .chip.write {
+            background: rgba(139,92,246,0.1);
+            border-color: rgba(139,92,246,0.2);
+            color: #a78bfa;
+        }
+        body.bapi-active .chip.write:hover {
+            background: rgba(139,92,246,0.18);
+            border-color: rgba(139,92,246,0.4);
+            color: #c4b5fd;
+            box-shadow: 0 4px 20px rgba(139,92,246,0.15);
+        }
+        body.bapi-active .input-row input:focus {
+            border-color: rgba(139,92,246,0.45);
+            box-shadow: 0 0 0 3px rgba(139,92,246,0.08),
+                        0 4px 20px rgba(0,0,0,0.15);
+        }
+        body.bapi-active .loading-dots span {
+            background: #8b5cf6;
+        }
+        body.bapi-active .welcome-icon {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 6px 30px rgba(139,92,246,0.35);
+        }
+        body.bapi-active .input-glow-wrap::before {
+            background: conic-gradient(
+                from var(--glow-angle, 0deg),
+                rgba(139,92,246,0.10) 0%,
+                rgba(167,139,250,0.30) 8%,
+                rgba(139,92,246,0.45) 15%,
+                rgba(167,139,250,0.30) 22%,
+                rgba(139,92,246,0.06) 35%,
+                transparent 50%,
+                transparent 75%,
+                rgba(139,92,246,0.04) 88%,
+                rgba(139,92,246,0.10) 100%
+            );
+        }
+        body.bapi-active .input-glow-wrap:focus-within {
+            filter: drop-shadow(0 0 14px rgba(139,92,246,0.18))
+                    drop-shadow(0 0 30px rgba(167,139,250,0.08));
+        }
+        body.bapi-active .input-glow-wrap.loading {
+            filter: drop-shadow(0 0 12px rgba(139,92,246,0.3))
+                    drop-shadow(0 0 24px rgba(99,102,241,0.15));
+        }
+        body.bapi-active .qs-card:hover {
+            border-color: rgba(139,92,246,0.3);
+            box-shadow: 0 8px 30px rgba(139,92,246,0.15);
+        }
+        body.bapi-active .refined-query {
+            color: #a78bfa;
+            background: rgba(139,92,246,0.08);
+            border-left-color: rgba(139,92,246,0.5);
+        }
+
+        /* ── Chat area ── */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .chat-area::-webkit-scrollbar { width: 5px; }
+        .chat-area::-webkit-scrollbar-track { background: transparent; }
+        .chat-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        /* ── Messages ── */
+        .message {
+            max-width: 88%;
+            animation: msgIn 0.5s var(--spring) both;
+        }
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.96); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .message.user { align-self: flex-end; }
+        .message.bot  { align-self: flex-start; }
+
+        .message .bubble {
+            padding: 12px 16px;
+            border-radius: 20px;
+            line-height: 1.55;
+            font-size: 14px;
+            transition: transform 0.4s var(--spring), box-shadow 0.4s var(--ease-out);
+        }
+        .message .bubble:hover { transform: scale(1.01); }
+
+        /* User bubble — solid accent gradient */
+        .message.user .bubble {
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            color: #fff;
+            border-bottom-right-radius: 6px;
+            font-weight: 500;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        /* Bot bubble — frosted glass */
+        .message.bot .bubble {
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        /* Write result glass variants */
+        .message.bot .bubble.write-result {
+            border-left: 3px solid #34d399;
+            background: rgba(52,211,153,0.08);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+        }
+        .message.bot .bubble.write-error {
+            border-left: 3px solid #f87171;
+            background: rgba(248,113,113,0.08);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+        }
+        .message.bot .bubble.write-info {
+            border-left: 3px solid #60a5fa;
+            background: rgba(96,165,250,0.08);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+        }
+
+        /* ── Result output ── */
+        .result-block {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 12.5px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.55;
+            color: rgba(255,255,255,0.78);
+        }
+
+        .data-table-wrap {
+            backdrop-filter: blur(12px) saturate(150%);
+            -webkit-backdrop-filter: blur(12px) saturate(150%);
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 14px;
+            margin: 6px 0;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .error-msg { color: #f87171; font-size: 13px; }
+
+        .refined-query {
+            font-size: 12px;
+            color: #fbbf24;
+            padding: 6px 12px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            background: rgba(245,158,11,0.08);
+            border-left: 2px solid rgba(245,158,11,0.5);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            animation: msgIn 0.4s var(--spring) both;
+        }
+
+        .ai-answer {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            font-size: 13.5px;
+            line-height: 1.65;
+            color: rgba(255,255,255,0.85);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .ai-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: rgba(139,92,246,0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(139,92,246,0.25);
+            margin-bottom: 8px;
+            letter-spacing: 0.4px;
+        }
+
+        /* ── Loading — bouncy dots ── */
+        .loading-dots {
+            display: inline-flex;
+            gap: 6px;
+            padding: 12px 16px;
+        }
+        .loading-dots span {
+            width: 9px; height: 9px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: dotBounce 1.4s ease-in-out infinite;
+        }
+        .loading-dots span:nth-child(2) { animation-delay: 0.16s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.32s; }
+        @keyframes dotBounce {
+            0%, 80%, 100% { transform: scale(0.5) translateY(0); opacity: 0.3; }
+            40% { transform: scale(1) translateY(-6px); opacity: 1; }
+        }
+
+        /* ── Input area — frosted glass bar ── */
+        .input-area {
+            flex-shrink: 0;
+            backdrop-filter: var(--glass-blur-heavy);
+            -webkit-backdrop-filter: var(--glass-blur-heavy);
+            background: rgba(14,15,26,0.55);
+            border-top: 1px solid var(--glass-border);
+            padding: 14px 24px 20px;
+        }
+
+        /* ── Suggestion chips ── */
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .chip {
+            font-size: 12px;
+            padding: 6px 14px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: linear-gradient(to bottom, var(--glass-bg-hover), var(--glass-bg));
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255,255,255,0.25);
+            border-radius: 20px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: transform 0.4s var(--spring), opacity 0.4s var(--spring), box-shadow 0.4s var(--spring);
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.1);
+            transform: translateZ(0);
+        }
+        .chip:hover {
+            background: linear-gradient(to bottom, rgba(255,255,255,0.18), var(--glass-bg-hover));
+            color: var(--text-primary);
+            border-color: var(--glass-border-hover);
+            transform: translateY(-3px) scale(1.04);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+        .chip:active {
+            transform: translateY(0) scale(0.97);
+            transition-duration: 0.1s;
+        }
+        .chip.write {
+            background: rgba(245,158,11,0.1);
+            border-color: rgba(245,158,11,0.2);
+            color: #fbbf24;
+        }
+        .chip.write:hover {
+            background: rgba(245,158,11,0.18);
+            border-color: rgba(245,158,11,0.4);
+            color: #fcd34d;
+            box-shadow: 0 4px 20px rgba(245,158,11,0.15);
+        }
+
+        /* ── Chip burst animation (temporary class, removed after animation) ── */
+        .chip-animating {
+            will-change: transform, opacity;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+
+        /* ── PO confirmation buttons ── */
+        .confirm-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .confirm-btn {
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s var(--spring);
+        }
+        .confirm-yes {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(34,197,94,0.3);
+        }
+        .confirm-yes:hover {
+            transform: translateY(-1px) scale(1.03);
+            box-shadow: 0 4px 16px rgba(34,197,94,0.4);
+        }
+        .confirm-no {
+            background: rgba(239,68,68,0.15);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.25);
+        }
+        .confirm-no:hover {
+            background: rgba(239,68,68,0.25);
+            transform: translateY(-1px) scale(1.03);
+        }
+
+        /* ── P2P step action buttons ── */
+        .p2p-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .p2p-next-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+        .p2p-btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: none;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s var(--spring);
+        }
+        .p2p-continue {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(34,197,94,0.3);
+        }
+        .p2p-continue:hover {
+            transform: translateY(-1px) scale(1.03);
+            box-shadow: 0 4px 16px rgba(34,197,94,0.4);
+        }
+        .p2p-auto {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(59,130,246,0.3);
+        }
+        .p2p-auto:hover {
+            transform: translateY(-1px) scale(1.03);
+            box-shadow: 0 4px 16px rgba(59,130,246,0.4);
+        }
+        .p2p-stop {
+            background: rgba(239,68,68,0.15);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.25);
+        }
+        .p2p-stop:hover {
+            background: rgba(239,68,68,0.25);
+            transform: translateY(-1px) scale(1.03);
+        }
+
+        /* ── Input row ── */
+        .input-row { display: flex; gap: 10px; }
+
+        /* Glow-border wrapper — sits around the input */
+        .input-glow-wrap {
+            flex: 1;
+            position: relative;
+            border-radius: 16px;
+            transition: filter 0.8s ease-in-out;
+        }
+
+        /* ── Two gradient layers, cross-faded via opacity ── */
+        /* Layer 1: ::before = focus (soft orange ambient) */
+        .input-glow-wrap::before,
+        .glow-loading-ring {
+            position: absolute;
+            inset: -2px;
+            border-radius: 18px;
+            opacity: 0;
+            transition: opacity 0.8s ease-in-out;
+            pointer-events: none;
+        }
+        .input-glow-wrap::before {
+            content: '';
+            background: conic-gradient(
+                from var(--glow-angle, 0deg),
+                rgba(245,158,11,0.10) 0%,
+                rgba(251,191,36,0.30) 8%,
+                rgba(245,158,11,0.45) 15%,
+                rgba(251,191,36,0.30) 22%,
+                rgba(245,158,11,0.06) 35%,
+                transparent 50%,
+                transparent 75%,
+                rgba(245,158,11,0.04) 88%,
+                rgba(245,158,11,0.10) 100%
+            );
+            z-index: 0;
+        }
+        /* Layer 2: .glow-loading-ring = loading (bright multi-color) */
+        .glow-loading-ring {
+            background: conic-gradient(
+                from var(--glow-angle, 0deg),
+                transparent 0%,
+                #f59e0b 10%,
+                #f97316 20%,
+                #8b5cf6 35%,
+                #3b82f6 50%,
+                transparent 60%
+            );
+            z-index: 0;
+        }
+
+        /* Focus — fade in orange layer */
+        .input-glow-wrap:focus-within::before {
+            opacity: 1;
+        }
+        /* Loading — fade in multi-color layer (covers orange) */
+        .input-glow-wrap.loading .glow-loading-ring {
+            opacity: 1;
+        }
+        /* When loading ends but still focused, orange is still visible underneath */
+
+        /* Inner mask — thin border trace */
+        .input-glow-wrap .glow-inner-mask {
+            position: absolute;
+            inset: 1.5px;
+            border-radius: 15px;
+            background: #0e0f1a;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Soft orange aura behind bar on focus */
+        .input-glow-wrap:focus-within {
+            filter: drop-shadow(0 0 14px rgba(245,158,11,0.18))
+                    drop-shadow(0 0 30px rgba(251,191,36,0.08));
+        }
+        /* Loading aura — stronger, adds purple hint */
+        .input-glow-wrap.loading {
+            filter: drop-shadow(0 0 12px rgba(245,158,11,0.3))
+                    drop-shadow(0 0 24px rgba(139,92,246,0.15));
+        }
+
+        .input-row input {
+            width: 100%;
+            position: relative;
+            z-index: 2;
+            padding: 14px 18px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.4s var(--spring);
+        }
+
+        .input-row input:focus {
+            border-color: rgba(245,158,11,0.45);
+            background: rgba(255,255,255,0.08);
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.08),
+                        0 4px 20px rgba(0,0,0,0.15);
+            transform: scale(1.005);
+        }
+        /* When rotating streak is active (focus or loading), hide default border */
+        .input-glow-wrap:focus-within input,
+        .input-glow-wrap.loading input {
+            border-color: transparent;
+        }
+        .input-glow-wrap:focus-within input:focus,
+        .input-glow-wrap.loading input:focus {
+            border-color: transparent;
+            box-shadow: none;
+        }
+        .input-row input::placeholder { color: var(--text-tertiary); }
+        .input-row button {
+            padding: 14px 26px;
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.4s var(--spring);
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+        .input-row button:hover {
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 6px 24px var(--accent-glow);
+        }
+        .input-row button:active {
+            transform: translateY(0) scale(0.97);
+            transition-duration: 0.1s;
+        }
+        .input-row button:disabled {
+            background: rgba(255,255,255,0.08);
+            cursor: not-allowed;
+            color: var(--text-tertiary);
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* ── Welcome screen ── */
+        .welcome {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-secondary);
+            animation: welcomeIn 0.8s var(--spring) both;
+        }
+        @keyframes welcomeIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .welcome-icon {
+            width: 68px; height: 68px;
+            background: linear-gradient(135deg, #f59e0b, #f97316);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; font-weight: 700; color: #fff;
+            margin: 0 auto 22px;
+            box-shadow: 0 6px 30px var(--accent-glow);
+            transition: transform 0.6s var(--spring);
+        }
+        .welcome-icon:hover { transform: scale(1.1) rotate(-5deg); }
+        .welcome h2 {
+            font-size: 26px;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.4px;
+        }
+        .welcome p {
+            font-size: 14px;
+            max-width: 520px;
+            margin: 0 auto;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+
+        /* Badges */
+        .badge-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: transform 0.4s var(--spring);
+        }
+        .badge:hover { transform: scale(1.06); }
+        .badge.read {
+            background: rgba(96,165,250,0.12);
+            color: #93bbfc;
+            border: 1px solid rgba(96,165,250,0.2);
+        }
+        .badge.write {
+            background: rgba(245,158,11,0.12);
+            color: #fbbf24;
+            border: 1px solid rgba(245,158,11,0.2);
+        }
+        .badge.live {
+            background: rgba(52,211,153,0.12);
+            color: #6ee7b7;
+            border: 1px solid rgba(52,211,153,0.2);
+        }
+
+        /* Quick-start cards — glass cards */
+        .quick-start {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        .qs-card {
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 16px 20px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.45s var(--spring);
+            width: 170px;
+        }
+        .qs-card:hover {
+            background: var(--glass-bg-hover);
+            border-color: rgba(245,158,11,0.3);
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+        }
+        .qs-card:active {
+            transform: translateY(0) scale(0.97);
+            transition-duration: 0.1s;
+        }
+        .qs-card .qs-icon { font-size: 22px; margin-bottom: 8px; }
+        .qs-card .qs-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .qs-card .qs-desc {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+    </style>
+</head>
+<body>
+
+<!-- Circular transition overlay — expands/collapses from toggle button -->
+<div id="modeTransitionOverlay" class="mode-transition-overlay"></div>
+
+<!-- Animated gradient blobs behind everything -->
+<div class="bg-layer">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+</div>
+
+<div class="header">
+    <div class="header-icon">P</div>
+    <h1>PrintWorks SAP Assistant</h1>
+    <div class="mode-toggle">
+        <span class="mode-label active" id="labelChatv3" onclick="setMode('chatv3')">ChatV3</span>
+        <div class="toggle-track" id="toggleTrack" onclick="toggleMode()">
+            <div class="toggle-thumb"></div>
+        </div>
+        <span class="mode-label" id="labelBapi" onclick="setMode('bapi')">BAPI</span>
+    </div>
+    <span class="subtitle" id="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
+    </span>
+</div>
+
+<div class="chat-area" id="chatArea">
+    <div class="welcome">
+        <div class="welcome-icon">P</div>
+        <h2>PrintWorks SAP Assistant</h2>
+        <p>Query orders, deliveries, invoices, customers & vendors. Create sales orders, purchase orders, record payments and more — all in natural language.</p>
+        <div class="badge-row">
+            <span class="badge read">Read Queries</span>
+            <span class="badge write">Write Operations</span>
+            <span class="badge live">HANA Cloud Live</span>
+        </div>
+        <div class="quick-start" id="quickStart">
+            <div class="qs-card" data-q="dashboard">
+                <div class="qs-icon">📊</div>
+                <div class="qs-title">Dashboard</div>
+                <div class="qs-desc">Business overview</div>
+            </div>
+            <div class="qs-card" data-q="orders">
+                <div class="qs-icon">📦</div>
+                <div class="qs-title">Sales Orders</div>
+                <div class="qs-desc">Browse recent orders</div>
+            </div>
+            <div class="qs-card" data-q="purchase orders">
+                <div class="qs-icon">🛒</div>
+                <div class="qs-title">Purchase Orders</div>
+                <div class="qs-desc">Procurement pipeline</div>
+            </div>
+            <div class="qs-card" data-q="overdue invoices">
+                <div class="qs-icon">⚠️</div>
+                <div class="qs-title">Overdue Invoices</div>
+                <div class="qs-desc">Needs attention</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="input-area">
+    <div class="suggestions" id="suggestions"></div>
+    <div class="input-row">
+        <div class="input-glow-wrap" id="inputGlow">
+            <div class="glow-loading-ring"></div>
+            <div class="glow-inner-mask"></div>
+            <input type="text" id="msgInput" placeholder="Ask about orders, create POs, record payments..." autocomplete="off">
+        </div>
+        <button id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const chatArea = document.getElementById('chatArea');
+    const msgInput = document.getElementById('msgInput');
+    const sendBtn  = document.getElementById('sendBtn');
+    const suggestionsDiv = document.getElementById('suggestions');
+    const inputGlow = document.getElementById('inputGlow');
+    const toggleTrack = document.getElementById('toggleTrack');
+    const labelChatv3 = document.getElementById('labelChatv3');
+    const labelBapi = document.getElementById('labelBapi');
+    const modeToggleWrap = document.querySelector('.mode-toggle');
+    const overlay = document.getElementById('modeTransitionOverlay');
+    let isLoading = false;
+    let currentMode = 'chatv3';
+    let isAnimating = false;   // lock to prevent rapid toggling
+
+    /* ─────────────────────────────────────────────────────
+       SMOOTH CIRCULAR COLOR-WASH TRANSITION
+       ─────────────────────────────────────────────────────
+       How it works:
+       1. A semi-transparent tint overlay expands as a circle
+          from the toggle button outward (clip-path: circle()).
+       2. At the SAME time, body.bapi-active is toggled, which
+          triggers CSS transitions on every themed element
+          (blobs, buttons, icons, chips, input glow, etc.).
+       3. The elements morph their colors smoothly in-place
+          while the tint sweep gives directional motion.
+       4. Content is ALWAYS visible — the overlay is just a
+          light color wash, never an opaque wall.
+       5. Once the circle reaches the edges and the CSS
+          transitions settle, the overlay fades out gently.
+       ───────────────────────────────────────────────────── */
+
+    function getToggleCenter() {
+        const rect = toggleTrack.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+    }
+
+    function getMaxRadius(cx, cy) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        return Math.ceil(Math.hypot(
+            Math.max(cx, w - cx),
+            Math.max(cy, h - cy)
+        ));
+    }
+
+    function animateModeTransition(toMode) {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        const { x: cx, y: cy } = getToggleCenter();
+        const maxR = getMaxRadius(cx, cy);
+
+        // Lock toggle to prevent rapid switching
+        modeToggleWrap.classList.add('locked');
+
+        // Set overlay tint color based on destination
+        overlay.className = 'mode-transition-overlay '
+            + (toMode === 'bapi' ? 'to-bapi' : 'to-chatv3');
+
+        // ── Immediately apply the theme class ──
+        // CSS transitions on every element will smoothly morph
+        // colors in-place over ~0.5s. No flash, no disappear.
+        currentMode = toMode;
+
+        if (toMode === 'bapi') {
+            document.body.classList.add('bapi-active');
+            toggleTrack.classList.add('bapi');
+            labelBapi.classList.add('active');
+            labelChatv3.classList.remove('active');
+        } else {
+            document.body.classList.remove('bapi-active');
+            toggleTrack.classList.remove('bapi');
+            labelChatv3.classList.add('active');
+            labelBapi.classList.remove('active');
+        }
+
+        animateChipsOut(() => {
+            updateSuggestions();
+            animateChipsIn();
+        });
+
+        // ── Animate the circular tint sweep ──
+        // Expands from toggle center → full screen.
+        // Semi-transparent, so content shows through the whole time.
+        // Gives that "wave of color" directional feel.
+        const sweepDuration = 550;
+
+        const sweepAnim = overlay.animate([
+            { clipPath: `circle(0px at ${cx}px ${cy}px)`, opacity: 1 },
+            { clipPath: `circle(${maxR}px at ${cx}px ${cy}px)`, opacity: 1 }
+        ], {
+            duration: sweepDuration,
+            easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            fill: 'forwards'
+        });
+
+        sweepAnim.onfinish = () => {
+            // ── Fade out the tint overlay smoothly ──
+            // By now the CSS transitions have morphed all elements.
+            // The overlay has done its job — dissolve it gently.
+            const fadeAnim = overlay.animate([
+                { opacity: 1 },
+                { opacity: 0 }
+            ], {
+                duration: 300,
+                easing: 'ease-out',
+                fill: 'forwards'
+            });
+
+            fadeAnim.onfinish = () => {
+                // Clean up
+                overlay.className = 'mode-transition-overlay';
+                overlay.getAnimations().forEach(a => a.cancel());
+                modeToggleWrap.classList.remove('locked');
+                isAnimating = false;
+            };
+        };
+    }
+
+    function setMode(mode) {
+        if (mode === currentMode || isAnimating) return;
+        animateModeTransition(mode);
+    }
+
+    function toggleMode() {
+        if (isAnimating) return;
+        animateModeTransition(currentMode === 'chatv3' ? 'bapi' : 'chatv3');
+    }
+
+    function updateSuggestions() {
+        if (currentMode === 'bapi') {
+            suggestionsDiv.innerHTML = `
+                <span class="chip" data-q="dashboard">Dashboard</span>
+                <span class="chip" data-q="orders">Orders</span>
+                <span class="chip" data-q="purchase orders">Purchase Orders</span>
+                <span class="chip" data-q="vendors">Vendors</span>
+                <span class="chip" data-q="customers">Customers</span>
+                <span class="chip write" data-q="create po for " data-focus="true">BAPI: Create PO</span>
+                <span class="chip write" data-q="create order for " data-focus="true">BAPI: Create SO</span>
+                <span class="chip write" data-q="receive goods " data-focus="true">BAPI: Goods Receipt</span>
+                <span class="chip write" data-q="create vendor invoice " data-focus="true">BAPI: Invoice</span>
+                <span class="chip write" data-q="pay vendor " data-focus="true">BAPI: Pay Vendor</span>
+                <span class="chip write" data-q="run p2p cycle">Run P2P Cycle</span>
+                <span class="chip write" data-q="run o2c cycle">Run O2C Cycle</span>
+                <span class="chip write" data-q="run both">Run Both Demos</span>
+                <span class="chip" data-q="help">Help</span>
+            `;
+        } else {
+            suggestionsDiv.innerHTML = `
+                <span class="chip" data-q="dashboard">Dashboard</span>
+                <span class="chip" data-q="orders">Orders</span>
+                <span class="chip" data-q="open orders">Open Orders</span>
+                <span class="chip" data-q="customers">Customers</span>
+                <span class="chip" data-q="deliveries">Deliveries</span>
+                <span class="chip" data-q="invoices">Invoices</span>
+                <span class="chip" data-q="overdue invoices">Overdue</span>
+                <span class="chip" data-q="purchase orders">Purchase Orders</span>
+                <span class="chip" data-q="open purchase orders">Open POs</span>
+                <span class="chip" data-q="vendors">Vendors</span>
+                <span class="chip" data-q="vendor invoices">Vendor Invoices</span>
+                <span class="chip" data-q="goods receipts">Goods Receipts</span>
+                <span class="chip" data-q="procurement materials">Proc. Materials</span>
+                <span class="chip" data-q="products">Products</span>
+                <span class="chip" data-q="revenue by region">Revenue</span>
+                <span class="chip" data-q="check vendor " data-focus="true">Check Vendor</span>
+                <span class="chip" data-q="check material " data-focus="true">Check Material</span>
+                <span class="chip" data-q="po status " data-focus="true">PO Status</span>
+                <span class="chip" data-q="order status " data-focus="true">Order Status</span>
+                <span class="chip" data-q="overdue purchase orders">Overdue POs</span>
+                <span class="chip" data-q="pending actions">Pending Actions</span>
+                <span class="chip write" data-q="create order for " data-focus="true">+ Create Order</span>
+                <span class="chip write" data-q="create po for " data-focus="true">+ Create PO</span>
+                <span class="chip write" data-q="approve po " data-focus="true">Approve PO</span>
+                <span class="chip write" data-q="receive goods " data-focus="true">Receive Goods</span>
+                <span class="chip write" data-q="create vendor invoice " data-focus="true">Create Invoice</span>
+                <span class="chip write" data-q="pay vendor " data-focus="true">Pay Vendor</span>
+                <span class="chip write" data-q="close po " data-focus="true">Close PO</span>
+                <span class="chip" data-q="help">Help</span>
+            `;
+        }
+        // Re-attach chip listeners
+        suggestionsDiv.querySelectorAll('.chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                msgInput.value = chip.dataset.q;
+                if (chip.dataset.focus === 'true') {
+                    msgInput.focus();
+                } else {
+                    sendMessage();
+                }
+            });
+        });
+    }
+
+    // ── Phase 1: Old chips collapse TO center, then call onDone ──
+    function animateChipsOut(onDone) {
+        const chips = Array.from(suggestionsDiv.querySelectorAll('.chip'));
+        if (!chips.length) { onDone(); return; }
+
+        const containerRect = suggestionsDiv.getBoundingClientRect();
+        const cx = containerRect.left + containerRect.width / 2;
+        const cy = containerRect.top + containerRect.height / 2;
+
+        let finished = 0;
+        const total = chips.length;
+
+        chips.forEach((chip, i) => {
+            const r = chip.getBoundingClientRect();
+            const chipCx = r.left + r.width / 2;
+            const chipCy = r.top + r.height / 2;
+            const dx = cx - chipCx;
+            const dy = cy - chipCy;
+
+            chip.classList.add('chip-animating');
+            const delay = i * 15; // micro-stagger for organic feel
+
+            const wobble = (Math.random() - 0.5) * 24; // random -12deg to +12deg
+            setTimeout(() => {
+                chip.style.transition = 'transform 0.35s cubic-bezier(0.6, -0.28, 0.74, 0.05), opacity 0.25s ease, filter 0.3s ease';
+                chip.style.transform = `translate(${dx}px, ${dy}px) scale(0.7) rotate(${wobble}deg)`;
+                chip.style.opacity = '0';
+                chip.style.filter = 'blur(4px)';
+
+                chip.addEventListener('transitionend', function done(e) {
+                    if (e.propertyName === 'transform') {
+                        chip.removeEventListener('transitionend', done);
+                        finished++;
+                        if (finished === total) onDone();
+                    }
+                });
+            }, delay);
+        });
+
+        // Safety fallback in case transitionend doesn't fire for all
+        setTimeout(() => { if (finished < total) onDone(); }, 600);
+    }
+
+    // ── Phase 2: New chips burst FROM center to their natural positions ──
+    function animateChipsIn() {
+        const chips = Array.from(suggestionsDiv.querySelectorAll('.chip'));
+        if (!chips.length) return;
+
+        // Capture each chip's final position (already in DOM)
+        const containerRect = suggestionsDiv.getBoundingClientRect();
+        const cx = containerRect.left + containerRect.width / 2;
+        const cy = containerRect.top + containerRect.height / 2;
+
+        const finalRects = chips.map(c => c.getBoundingClientRect());
+
+        // Move all chips to center (invisible + scaled down)
+        chips.forEach((chip, i) => {
+            const r = finalRects[i];
+            const chipCx = r.left + r.width / 2;
+            const chipCy = r.top + r.height / 2;
+            const dx = cx - chipCx;
+            const dy = cy - chipCy;
+
+            const wobble = (Math.random() - 0.5) * 24; // random -12deg to +12deg
+            chip.classList.add('chip-animating');
+            chip.style.transition = 'none';
+            chip.style.transform = `translate(${dx}px, ${dy}px) scale(0.7) rotate(${wobble}deg)`;
+            chip.style.opacity = '0';
+            chip.style.filter = 'blur(4px)';
+        });
+
+        // Force reflow to register the start state
+        void suggestionsDiv.offsetHeight;
+
+        // Animate each chip from center back to its natural position
+        chips.forEach((chip, i) => {
+            const delay = i * 15; // micro-stagger for organic feel
+            setTimeout(() => {
+                chip.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.28, 0.64, 1), opacity 0.35s ease, filter 0.4s ease';
+                chip.style.transform = '';
+                chip.style.opacity = '';
+                chip.style.filter = '';
+
+                chip.addEventListener('transitionend', function cleanup(e) {
+                    if (e.propertyName === 'transform') {
+                        chip.classList.remove('chip-animating');
+                        chip.style.transition = '';
+                        chip.removeEventListener('transitionend', cleanup);
+                    }
+                });
+            }, delay);
+        });
+    }
+
+    // ── Continuous glow rotation driven by JS (never resets) ──
+    let glowAngle = 0;
+    let glowSpeed = 30;          // deg/sec — focus speed (12s per revolution)
+    let glowTargetSpeed = 30;    // what we're easing toward
+    const FOCUS_SPEED = 30;      // 360/12 = 30 deg/sec
+    const LOADING_SPEED = 180;   // 360/2 = 180 deg/sec
+    let lastGlowTime = performance.now();
+
+    function tickGlow(now) {
+        const dt = (now - lastGlowTime) / 1000;
+        lastGlowTime = now;
+        // Smoothly ease current speed toward target
+        glowSpeed += (glowTargetSpeed - glowSpeed) * Math.min(dt * 2.5, 1);
+        glowAngle = (glowAngle + glowSpeed * dt) % 360;
+        inputGlow.style.setProperty('--glow-angle', glowAngle + 'deg');
+        requestAnimationFrame(tickGlow);
+    }
+    requestAnimationFrame(tickGlow);
+
+    // Quick-start cards
+    document.querySelectorAll('.qs-card').forEach(card => {
+        card.addEventListener('click', () => {
+            msgInput.value = card.dataset.q;
+            sendMessage();
+        });
+    });
+
+    // Initialize suggestion chips for current mode
+    updateSuggestions();
+
+    // Health check
+    fetch('/api/health')
+        .then(r => r.json())
+        .then(data => {
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('statusText');
+            if (data.status === 'ok') {
+                dot.classList.add('ok');
+                txt.textContent = `Connected — ${data.sales_orders.toLocaleString()} SO + ${data.purchase_orders.toLocaleString()} PO`;
+            } else {
+                dot.classList.add('error');
+                txt.textContent = 'HANA disconnected';
+            }
+        })
+        .catch(() => {
+            document.getElementById('statusDot').classList.add('error');
+            document.getElementById('statusText').textContent = 'Cannot reach server';
+        });
+
+    msgInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function addMessage(role, html, extraClass) {
+        const welcome = chatArea.querySelector('.welcome');
+        if (welcome) welcome.remove();
+
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        const bubbleCls = extraClass ? `bubble ${extraClass}` : 'bubble';
+        div.innerHTML = `<div class="${bubbleCls}">${html}</div>`;
+        chatArea.appendChild(div);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        return div;
+    }
+
+    function showLoading() {
+        const div = document.createElement('div');
+        div.className = 'message bot';
+        div.id = 'loading';
+        div.innerHTML = `<div class="bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>`;
+        chatArea.appendChild(div);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function hideLoading() {
+        const el = document.getElementById('loading');
+        if (el) el.remove();
+    }
+
+    function _buildP2PButtons(data) {
+        if (!data.p2p_pending) return '';
+        const nextHint = data.p2p_next_step || 'Next step';
+        const stepNum = data.p2p_step_index || 0;
+        const totalSteps = data.p2p_total_steps || 6;
+        return `<div class="p2p-next-hint">Next: ${escapeHtml(nextHint)} (${stepNum + 1}/${totalSteps})</div>
+            <div class="p2p-actions">
+                <button class="p2p-btn p2p-continue" onclick="sendP2PAction('continue')">Continue</button>
+                <button class="p2p-btn p2p-auto" onclick="sendP2PAction('continue all')">Continue All</button>
+                <button class="p2p-btn p2p-stop" onclick="sendP2PAction('stop')">Stop</button>
+            </div>`;
+    }
+
+    async function _sendAction(label, message) {
+        // Disable all action buttons
+        document.querySelectorAll('.confirm-btn, .p2p-btn').forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
+        addMessage('user', escapeHtml(label));
+        isLoading = true;
+        sendBtn.disabled = true;
+        inputGlow.classList.add('loading');
+        glowTargetSpeed = LOADING_SPEED;
+        showLoading();
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, mode: currentMode }),
+            });
+            const data = await resp.json();
+            hideLoading();
+            if (data.error) {
+                addMessage('bot', `<span class="error-msg">${escapeHtml(data.error)}</span>`, 'write-error');
+            } else {
+                let cls = '';
+                const r = data.result || '';
+                if (r.startsWith('\u2705') || r.includes('✅')) cls = 'write-result';
+                else if (r.startsWith('\u274c')) cls = 'write-error';
+                let html = `<div class="result-block">${escapeHtml(r)}</div>`;
+                html += _buildP2PButtons(data);
+                addMessage('bot', html, cls);
+            }
+        } catch (err) {
+            hideLoading();
+            addMessage('bot', `<span class="error-msg">Network error: ${escapeHtml(err.message)}</span>`, 'write-error');
+        } finally {
+            isLoading = false;
+            inputGlow.classList.remove('loading');
+            glowTargetSpeed = FOCUS_SPEED;
+            sendBtn.disabled = false;
+            msgInput.focus();
+        }
+    }
+
+    async function sendConfirm(answer) {
+        await _sendAction(answer, answer);
+    }
+
+    async function sendP2PAction(action) {
+        const labels = { 'continue': 'Continue', 'continue all': 'Continue All', 'stop': 'Stop' };
+        await _sendAction(labels[action] || action, action);
+    }
+
+    async function sendMessage() {
+        let text = msgInput.value.trim();
+        if (!text || isLoading) return;
+
+        addMessage('user', escapeHtml(text));
+        msgInput.value = '';
+        isLoading = true;
+        sendBtn.disabled = true;
+        inputGlow.classList.add('loading');
+        glowTargetSpeed = LOADING_SPEED;
+        showLoading();
+
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, mode: currentMode }),
+            });
+            const data = await resp.json();
+            hideLoading();
+
+            if (data.error) {
+                addMessage('bot', `<span class="error-msg">${escapeHtml(data.error)}</span>`, 'write-error');
+                return;
+            }
+
+            const result = data.result || '';
+            let bubbleClass = '';
+
+            if (data.is_write) {
+                if (result.startsWith('\u2705')) bubbleClass = 'write-result';
+                else if (result.startsWith('\u274c')) bubbleClass = 'write-error';
+                else if (result.startsWith('\u2139') || result.startsWith('\u2753')) bubbleClass = 'write-info';
+            }
+
+            let htmlParts = [];
+
+            // Show "Interpreted as" when DeepSeek rephrased the query
+            if (data.refined_query) {
+                htmlParts.push(`<div class="refined-query">Interpreted as: ${escapeHtml(data.refined_query)}</div>`);
+            }
+
+            // Show mode badge for BAPI write results
+            if (data.mode === 'bapi' && data.is_write) {
+                htmlParts.push(`<div class="mode-badge bapi-badge" style="display:inline-block;margin-bottom:8px;">BAPI Mode</div>`);
+            }
+
+            // AI direct answer (not a command result)
+            if (data.is_ai_answer) {
+                htmlParts.push(`<div class="ai-badge">DeepSeek AI</div>`);
+                htmlParts.push(`<div class="ai-answer">${escapeHtml(result)}</div>`);
+            } else {
+                const hasTable = result.includes(' | ') || result.includes('-+-');
+                if (hasTable && !data.is_write) {
+                    htmlParts.push(`<div class="data-table-wrap"><div class="result-block">${escapeHtml(result)}</div></div>`);
+                } else {
+                    htmlParts.push(`<div class="result-block">${escapeHtml(result)}</div>`);
+                }
+            }
+
+            // Show confirm/cancel buttons for PO preview
+            if (data.pending_confirm) {
+                htmlParts.push(`<div class="confirm-actions">
+                    <button class="confirm-btn confirm-yes" onclick="sendConfirm('yes')">Confirm</button>
+                    <button class="confirm-btn confirm-no" onclick="sendConfirm('no')">Cancel</button>
+                </div>`);
+            }
+
+            // Show P2P step action buttons
+            htmlParts.push(_buildP2PButtons(data));
+
+            addMessage('bot', htmlParts.join(''), bubbleClass);
+        } catch (err) {
+            hideLoading();
+            addMessage('bot', `<span class="error-msg">Network error: ${escapeHtml(err.message)}</span>`, 'write-error');
+        } finally {
+            isLoading = false;
+            inputGlow.classList.remove('loading');
+            glowTargetSpeed = FOCUS_SPEED;
+            sendBtn.disabled = false;
+            msgInput.focus();
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+hdbcli
+together
+python-dotenv
+flask

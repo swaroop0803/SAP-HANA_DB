@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintWorks SAP AI Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: #1a1b23;
+            border-bottom: 1px solid #2a2b35;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .header-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #f0f0f0;
+        }
+        .header .subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-left: auto;
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #555;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-dot.ok { background: #22c55e; }
+        .status-dot.error { background: #ef4444; }
+
+        /* Chat area */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Messages */
+        .message {
+            max-width: 85%;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            align-self: flex-end;
+        }
+        .message.bot {
+            align-self: flex-start;
+        }
+        .message .bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .message.user .bubble {
+            background: #3b82f6;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .message.bot .bubble {
+            background: #1e1f2a;
+            border: 1px solid #2a2b35;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Bot message sections */
+        .refined {
+            font-size: 12px;
+            color: #8b8fa3;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+        .tool-badge {
+            display: inline-block;
+            font-size: 11px;
+            background: #2a2b35;
+            color: #8b8fa3;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .data-table {
+            background: #13141c;
+            border: 1px solid #2a2b35;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .data-table pre {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 12px;
+            color: #c0c4d6;
+            white-space: pre;
+            margin: 0;
+            line-height: 1.4;
+        }
+        .summary {
+            background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
+            border-left: 3px solid #3b82f6;
+            padding: 10px 14px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #d0d4e6;
+        }
+        .row-count {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .error-msg {
+            color: #f87171;
+            font-size: 13px;
+        }
+
+        /* Loading */
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+            padding: 12px 16px;
+        }
+        .loading-dots span {
+            width: 8px; height: 8px;
+            background: #555;
+            border-radius: 50%;
+            animation: bounce 1.2s infinite;
+        }
+        .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Input area */
+        .input-area {
+            flex-shrink: 0;
+            background: #1a1b23;
+            border-top: 1px solid #2a2b35;
+            padding: 12px 24px 16px;
+        }
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .chip {
+            font-size: 12px;
+            padding: 6px 12px;
+            background: #1e1f2a;
+            border: 1px solid #2a2b35;
+            border-radius: 20px;
+            color: #8b8fa3;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .chip:hover {
+            background: #2a2b35;
+            color: #c0c4d6;
+            border-color: #3b82f6;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        .input-row input {
+            flex: 1;
+            padding: 12px 16px;
+            background: #13141c;
+            border: 1px solid #2a2b35;
+            border-radius: 12px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .input-row input:focus {
+            border-color: #3b82f6;
+        }
+        .input-row input::placeholder {
+            color: #555;
+        }
+        .input-row button {
+            padding: 12px 20px;
+            background: #3b82f6;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .input-row button:hover {
+            background: #2563eb;
+        }
+        .input-row button:disabled {
+            background: #333;
+            cursor: not-allowed;
+        }
+
+        /* Welcome message */
+        .welcome {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+        .welcome h2 {
+            font-size: 22px;
+            color: #c0c4d6;
+            margin-bottom: 8px;
+        }
+        .welcome p {
+            font-size: 14px;
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-icon">P</div>
+    <h1>PrintWorks SAP AI Assistant</h1>
+    <span class="subtitle" id="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
+    </span>
+</div>
+
+<div class="chat-area" id="chatArea">
+    <div class="welcome">
+        <h2>Ask anything about your SAP data</h2>
+        <p>Orders, deliveries, invoices, revenue analytics, customers, products — powered by AI with natural language understanding.</p>
+    </div>
+</div>
+
+<div class="input-area">
+    <div class="suggestions" id="suggestions">
+        <span class="chip" data-q="Revenue by region">Revenue by region</span>
+        <span class="chip" data-q="Top 10 customers by order value">Top customers</span>
+        <span class="chip" data-q="Show open orders">Open orders</span>
+        <span class="chip" data-q="Overdue invoices">Overdue invoices</span>
+        <span class="chip" data-q="Top selling products">Top products</span>
+        <span class="chip" data-q="Revenue trend by quarter">Revenue by quarter</span>
+        <span class="chip" data-q="Delivery status for pending shipments">Pending deliveries</span>
+        <span class="chip" data-q="Show all Indian customers">Indian customers</span>
+    </div>
+    <div class="input-row">
+        <input type="text" id="msgInput" placeholder="Ask about orders, revenue, customers..." autocomplete="off">
+        <button id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const chatArea = document.getElementById('chatArea');
+    const msgInput = document.getElementById('msgInput');
+    const sendBtn  = document.getElementById('sendBtn');
+    let isLoading = false;
+
+    // Health check on load
+    fetch('/api/health')
+        .then(r => r.json())
+        .then(data => {
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('statusText');
+            if (data.status === 'ok') {
+                dot.classList.add('ok');
+                txt.textContent = `Connected — ${data.orders_loaded.toLocaleString()} orders`;
+            } else {
+                dot.classList.add('error');
+                txt.textContent = 'HANA disconnected';
+            }
+        })
+        .catch(() => {
+            document.getElementById('statusDot').classList.add('error');
+            document.getElementById('statusText').textContent = 'Cannot reach server';
+        });
+
+    // Chip clicks
+    document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            msgInput.value = chip.dataset.q;
+            sendMessage();
+        });
+    });
+
+    // Enter key
+    msgInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    function addMessage(role, html) {
+        // Remove welcome message on first interaction
+        const welcome = chatArea.querySelector('.welcome');
+        if (welcome) welcome.remove();
+
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        div.innerHTML = `<div class="bubble">${html}</div>`;
+        chatArea.appendChild(div);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        return div;
+    }
+
+    function showLoading() {
+        const div = document.createElement('div');
+        div.className = 'message bot';
+        div.id = 'loading';
+        div.innerHTML = `<div class="bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>`;
+        chatArea.appendChild(div);
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function hideLoading() {
+        const el = document.getElementById('loading');
+        if (el) el.remove();
+    }
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    async function sendMessage() {
+        const text = msgInput.value.trim();
+        if (!text || isLoading) return;
+
+        addMessage('user', escapeHtml(text));
+        msgInput.value = '';
+        isLoading = true;
+        sendBtn.disabled = true;
+        showLoading();
+
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text }),
+            });
+            const data = await resp.json();
+            hideLoading();
+
+            if (data.error) {
+                addMessage('bot', `<span class="error-msg">Error: ${escapeHtml(data.error)}</span>`);
+                return;
+            }
+
+            let html = '';
+
+            // Refined query
+            if (data.refined_query) {
+                html += `<div class="refined">Interpreted as: ${escapeHtml(data.refined_query)}</div>`;
+            }
+
+            // Tool badge
+            if (data.tool) {
+                html += `<span class="tool-badge">${escapeHtml(data.tool)}</span> `;
+            }
+
+            // Row count
+            if (data.row_count > 0) {
+                html += `<span class="row-count">${data.row_count} row${data.row_count !== 1 ? 's' : ''}</span>`;
+            }
+
+            // Data table
+            if (data.table) {
+                html += `<div class="data-table"><pre>${escapeHtml(data.table)}</pre></div>`;
+            }
+
+            // Summary
+            if (data.summary) {
+                html += `<div class="summary">${escapeHtml(data.summary)}</div>`;
+            }
+
+            addMessage('bot', html);
+        } catch (err) {
+            hideLoading();
+            addMessage('bot', `<span class="error-msg">Network error: ${escapeHtml(err.message)}</span>`);
+        } finally {
+            isLoading = false;
+            sendBtn.disabled = false;
+            msgInput.focus();
+        }
+    }
+</script>
+</body>
+</html>
