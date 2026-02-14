@@ -3,3 +3,5 @@ Ajay.py
 __pycache__/
 env/
 .env
+.env.*
+!.env.example
